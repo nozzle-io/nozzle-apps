@@ -1,0 +1,35 @@
+platforms:
+  - macos-universal
+  - windows-x64
+  - linux-x64
+
+apps:
+  - id: nozzle-viewer
+    repo: nozzle-io/nozzle-viewer
+    required: true
+    assets:
+      macos-universal: '^nozzle-viewer-latest-[0-9a-f]{7}-macos-universal\.zip$'
+      windows-x64: '^nozzle-viewer-latest-[0-9a-f]{7}-windows-x64\.zip$'
+      linux-x64: '^nozzle-viewer-latest-[0-9a-f]{7}-linux-x64\.zip$'
+
+  - id: nozzle-mixer
+    repo: nozzle-io/nozzle-mixer
+    required: true
+    assets:
+      macos-universal: '^nozzle-mixer-latest-[0-9a-f]{7}-macos-universal\.zip$'
+      windows-x64: '^nozzle-mixer-latest-[0-9a-f]{7}-windows-x64\.zip$'
+      linux-x64: '^nozzle-mixer-latest-[0-9a-f]{7}-linux-x64\.zip$'
+
+  - id: uvc-nozzle
+    repo: nozzle-io/uvc-nozzle
+    required: false
+    assets:
+      macos-universal: '^uvc-nozzle-latest-[0-9a-f]{7}-macos-universal\.zip$'
+
+  - id: nozzle-tester
+    repo: nozzle-io/nozzle-tester
+    required: true
+    assets:
+      macos-universal: '^nozzle-tester-latest-[0-9a-f]{7}-macos-universal\.zip$'
+      windows-x64: '^nozzle-tester-latest-[0-9a-f]{7}-windows-x64\.zip$'
+      linux-x64: '^nozzle-tester-latest-[0-9a-f]{7}-linux-x64\.zip$'

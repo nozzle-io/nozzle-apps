@@ -1,0 +1,83 @@
+name: Publish latest
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish-latest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Install Python dependencies
+        run: python3 -m pip install pyyaml
+      - name: Validate apps manifest
+        run: python3 scripts/validate-apps-manifest.py apps.yml
+      - name: Collect latest source assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/collect-latest-assets.py apps.yml --download-dir build/source --output build/source-assets.json
+      - name: Build aggregate bundles
+        run: python3 scripts/build-aggregate-bundles.py build/source-assets.json --source-dir build/source --output-dir dist
+      - name: Verify aggregate outputs
+        run: |
+          short_sha="${GITHUB_SHA::7}"
+          expected=(
+            "dist/nozzle-apps-latest-${short_sha}-macos-universal.zip"
+            "dist/nozzle-apps-latest-${short_sha}-windows-x64.zip"
+            "dist/nozzle-apps-latest-${short_sha}-linux-x64.zip"
+            "dist/SHA256SUMS"
+            "dist/manifest.json"
+          )
+          for path in "${expected[@]}"; do
+            test -f "$path"
+          done
+      - name: Move latest tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f latest "$GITHUB_SHA"
+          git push origin refs/tags/latest --force
+      - name: Publish latest release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          short_sha="${GITHUB_SHA::7}"
+          release_tag="latest"
+          title="Latest development snapshot"
+          notes="Mutable aggregate development snapshot from main. Commit: ${GITHUB_SHA}"
+          assets=(
+            "dist/nozzle-apps-latest-${short_sha}-macos-universal.zip"
+            "dist/nozzle-apps-latest-${short_sha}-windows-x64.zip"
+            "dist/nozzle-apps-latest-${short_sha}-linux-x64.zip"
+            "dist/SHA256SUMS"
+            "dist/manifest.json"
+          )
+          if release_id=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${release_tag}" --jq .id 2>/dev/null); then
+            gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}/assets" --jq '.[].id' > release-asset-ids.txt
+            while IFS= read -r asset_id; do
+              if [ -n "$asset_id" ]; then
+                gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/assets/${asset_id}"
+              fi
+            done < release-asset-ids.txt
+            gh release edit "$release_tag" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --title "$title" \
+              --notes "$notes" \
+              --prerelease
+            gh release upload "$release_tag" "${assets[@]}" --repo "${GITHUB_REPOSITORY}"
+          else
+            gh release create "$release_tag" "${assets[@]}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --verify-tag \
+              --title "$title" \
+              --notes "$notes" \
+              --prerelease
+          fi
+          echo "Release URL and uploaded assets:"
+          gh release view "$release_tag" --repo "${GITHUB_REPOSITORY}" --json url,assets --jq '.url, (.assets[].name)'
