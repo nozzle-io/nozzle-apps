@@ -62,11 +62,15 @@ def zip_dir(source_dir: Path, output_zip: Path) -> None:
                 archive.write(path, path.relative_to(source_dir.parent).as_posix())
 
 
-def write_source_sums(path: Path, source_entries: list[dict[str, Any]]) -> None:
-    lines = []
-    for entry in source_entries:
-        lines.append(f"{entry['source_asset_sha256']}  apps/{entry['app_id']}/{entry['source_asset_name']}")
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+def write_bundle_sums(root: Path) -> None:
+    lines: list[str] = []
+    for path in sorted(root.rglob("*")):
+        if not path.is_file() or path.name == "SHA256SUMS":
+            continue
+        lines.append(f"{sha256(path)}  {path.relative_to(root).as_posix()}")
+    if not lines:
+        fail(f"no bundle files to checksum under {root}")
+    (root / "SHA256SUMS").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def platform_entries(collected: dict[str, Any], platform: str) -> list[dict[str, Any]]:
@@ -157,7 +161,7 @@ def build(collected_path: Path, output_dir: Path, asset_prefix: str) -> None:
             "apps": entries,
         }
         (root / "manifest.json").write_text(json.dumps(bundle_manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        write_source_sums(root / "SHA256SUMS", entries)
+        write_bundle_sums(root)
 
         bundle_path = output_dir / bundle_name
         zip_dir(root, bundle_path)

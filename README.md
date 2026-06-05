@@ -53,7 +53,7 @@ The release also publishes:
 - `SHA256SUMS` for final aggregate assets
 - release-level `manifest.json` with final aggregate zip SHA256 values and source asset evidence
 
-Each aggregate zip contains its own `manifest.json` and `SHA256SUMS` for the source payloads included in that platform bundle. The final aggregate zip SHA256 is recorded in the release-level `manifest.json`, not inside the zip itself, because a file cannot honestly contain the SHA256 of the zip that already contains that same file.
+Each aggregate zip contains its own `manifest.json` and `SHA256SUMS` for the actual extracted files included in that platform bundle. After extraction, `sha256sum -c SHA256SUMS` from inside the `nozzle-apps/` directory must verify the bundle-local contents. Original source zip SHA256 evidence remains in `manifest.json`. The final aggregate zip SHA256 is recorded in the release-level `manifest.json`, not inside the zip itself, because a file cannot honestly contain the SHA256 of the zip that already contains that same file.
 
 ## Development
 
