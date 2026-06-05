@@ -55,6 +55,8 @@ The release also publishes:
 
 Each aggregate zip contains its own `manifest.json` and `SHA256SUMS` for the actual extracted files included in that platform bundle. After extraction, `sha256sum -c SHA256SUMS` from inside the `nozzle-apps/` directory must verify the bundle-local contents. Original source zip SHA256 evidence remains in `manifest.json`. The final aggregate zip SHA256 is recorded in the release-level `manifest.json`, not inside the zip itself, because a file cannot honestly contain the SHA256 of the zip that already contains that same file.
 
+The aggregate builder preserves Unix permission bits from the source app zips. The publish workflow verifies extracted aggregate bundles, including macOS `.app/Contents/MacOS/<CFBundleExecutable>` files being executable.
+
 ## Development
 
 Validate the manifest:
@@ -68,6 +70,13 @@ Collect and build locally:
 ```bash
 python3 scripts/collect-latest-assets.py apps.yml --download-dir build/source --output build/source-assets.json
 python3 scripts/build-aggregate-bundles.py build/source-assets.json --source-dir build/source --output-dir dist
+python3 scripts/verify-aggregate-bundles.py dist/nozzle-apps-latest-*.zip
+```
+
+Run the permission preservation regression test:
+
+```bash
+python3 scripts/test-permission-preservation.py
 ```
 
 Do not commit downloaded app zips or generated `dist` contents.

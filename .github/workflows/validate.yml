@@ -24,3 +24,5 @@ jobs:
         run: python3 scripts/validate-apps-manifest.py apps.yml
       - name: Compile scripts
         run: python3 -m py_compile scripts/*.py
+      - name: Permission preservation regression
+        run: python3 scripts/test-permission-preservation.py

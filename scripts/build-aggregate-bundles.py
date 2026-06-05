@@ -11,7 +11,7 @@ import shutil
 import subprocess
 import zipfile
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 
@@ -48,10 +48,21 @@ def workflow_run_url() -> str | None:
 def safe_extract(zip_path: Path, destination: Path) -> None:
     with zipfile.ZipFile(zip_path) as archive:
         for member in archive.infolist():
-            member_path = Path(member.filename)
-            if member_path.is_absolute() or ".." in member_path.parts:
+            member_path = PurePosixPath(member.filename)
+            if member_path.is_absolute() or not member_path.parts or ".." in member_path.parts:
                 fail(f"unsafe zip member in {zip_path}: {member.filename}")
-        archive.extractall(destination)
+            target = destination.joinpath(*member_path.parts)
+            mode = (member.external_attr >> 16) & 0o7777
+            if member.is_dir():
+                target.mkdir(parents=True, exist_ok=True)
+                if mode != 0:
+                    target.chmod(mode)
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with archive.open(member) as source, target.open("wb") as output:
+                shutil.copyfileobj(source, output)
+            if mode != 0:
+                target.chmod(mode)
 
 
 def zip_dir(source_dir: Path, output_zip: Path) -> None:

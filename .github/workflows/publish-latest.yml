@@ -37,13 +37,7 @@ jobs:
           for path in "${expected[@]}"; do
             test -f "$path"
           done
-          for zip in dist/nozzle-apps-latest-*.zip; do
-            tmp="$(mktemp -d)"
-            unzip -q "$zip" -d "$tmp"
-            test -f "$tmp/nozzle-apps/SHA256SUMS"
-            (cd "$tmp/nozzle-apps" && sha256sum -c SHA256SUMS)
-            rm -rf "$tmp"
-          done
+          python3 scripts/verify-aggregate-bundles.py dist/nozzle-apps-latest-*.zip
       - name: Move latest tag
         run: |
           git config user.name "github-actions[bot]"
