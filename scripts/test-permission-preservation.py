@@ -106,8 +106,11 @@ def main() -> int:
         build_module.build(source_assets, output_dir, "nozzle-apps-test")
 
         aggregate_zip = output_dir / "nozzle-apps-test-linux-x64.zip"
-        member_name = "nozzle-apps/apps/synthetic/synthetic-tool/bin/tool"
+        member_name = "nozzle-apps/apps/synthetic/bin/tool"
+        redundant_member = "nozzle-apps/apps/synthetic/synthetic-tool/bin/tool"
         with zipfile.ZipFile(aggregate_zip) as archive:
+            if redundant_member in archive.namelist():
+                fail(f"redundant source zip root was not stripped: {redundant_member}")
             try:
                 member = archive.getinfo(member_name)
             except KeyError as exc:
