@@ -42,10 +42,17 @@ def add_zip_member(archive: zipfile.ZipFile, name: str, data: bytes, mode: int) 
     archive.writestr(info, data)
 
 
-def make_source_zip(path: Path) -> None:
+def make_wrapped_source_zip(path: Path) -> None:
     with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        add_zip_member(archive, "synthetic-tool/bin/tool", b"#!/bin/sh\nexit 0\n", 0o755)
-        add_zip_member(archive, "synthetic-tool/share/readme.txt", b"readme\n", 0o644)
+        root = path.stem
+        add_zip_member(archive, f"{root}/bin/tool", b"#!/bin/sh\nexit 0\n", 0o755)
+        add_zip_member(archive, f"{root}/share/readme.txt", b"readme\n", 0o644)
+
+
+def make_app_source_zip(path: Path) -> None:
+    with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        add_zip_member(archive, "Synthetic.app/Contents/Info.plist", b"<?xml version=\"1.0\"?>\n", 0o644)
+        add_zip_member(archive, "Synthetic.app/Contents/MacOS/Synthetic", b"#!/bin/sh\nexit 0\n", 0o755)
 
 
 def write_source_assets(path: Path, source_zip: Path) -> None:
@@ -101,7 +108,7 @@ def main() -> int:
         source_zip = root / "synthetic-source.zip"
         source_assets = root / "source-assets.json"
         output_dir = root / "dist"
-        make_source_zip(source_zip)
+        make_wrapped_source_zip(source_zip)
         write_source_assets(source_assets, source_zip)
         build_module.build(source_assets, output_dir, "nozzle-apps-test")
 
@@ -127,6 +134,29 @@ def main() -> int:
         if not os.access(tool, os.X_OK):
             fail(f"extracted executable is not +x: {tool}")
         print(f"permission preservation OK: {member_name}")
+
+    with tempfile.TemporaryDirectory(prefix="nozzle-apps-app-root-test-") as tmp:
+        root = Path(tmp)
+        source_zip = root / "synthetic-app-source.zip"
+        source_assets = root / "source-assets.json"
+        output_dir = root / "dist"
+        make_app_source_zip(source_zip)
+        write_source_assets(source_assets, source_zip)
+        build_module.build(source_assets, output_dir, "nozzle-apps-test")
+
+        aggregate_zip = output_dir / "nozzle-apps-test-linux-x64.zip"
+        app_member = "nozzle-apps/apps/synthetic/Synthetic.app/Contents/MacOS/Synthetic"
+        stripped_member = "nozzle-apps/apps/synthetic/Contents/MacOS/Synthetic"
+        with zipfile.ZipFile(aggregate_zip) as archive:
+            names = archive.namelist()
+            if stripped_member in names:
+                fail(f"macOS app root was stripped: {stripped_member}")
+            if app_member not in names:
+                fail(f"missing preserved app bundle member: {app_member}")
+            mode = (archive.getinfo(app_member).external_attr >> 16) & 0o7777
+            if mode & 0o111 == 0:
+                fail(f"{app_member}: aggregate zip member is not executable, mode={mode:o}")
+        print(f"app bundle root preservation OK: {app_member}")
     return 0
 
 

@@ -102,6 +102,27 @@ def verify_no_redundant_source_roots(root: Path) -> None:
             fail(f"{root}: redundant source zip root was not stripped: {redundant.relative_to(root)}")
 
 
+def verify_macos_app_roots(root: Path) -> None:
+    manifest_path = root / "manifest.json"
+    if not manifest_path.is_file():
+        fail(f"missing bundle manifest: {manifest_path}")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    platform = manifest.get("platform")
+    if not isinstance(platform, str) or "macos" not in platform:
+        return
+
+    apps_root = root / "apps"
+    for app in manifest.get("apps", []):
+        app_id = app.get("app_id")
+        if not isinstance(app_id, str):
+            fail(f"{manifest_path}: malformed app entry")
+        app_root = apps_root / app_id
+        if (app_root / "Contents").exists():
+            fail(f"{root}: macOS app bundle root was stripped: {app_root.relative_to(root)}/Contents")
+        if not any(app_root.rglob("*.app")):
+            fail(f"{root}: expected a .app bundle under {app_root.relative_to(root)}")
+
+
 def verify_zip(zip_path: Path) -> None:
     if not zip_path.is_file():
         fail(f"missing zip: {zip_path}")
@@ -115,6 +136,7 @@ def verify_zip(zip_path: Path) -> None:
             fail(f"{zip_path}: missing nozzle-apps root after extraction")
         verify_bundle_sha256s(root)
         verify_no_redundant_source_roots(root)
+        verify_macos_app_roots(root)
         verify_macos_apps(root, zip_path.name)
     print(f"verified {zip_path}")
 

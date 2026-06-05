@@ -45,17 +45,25 @@ def workflow_run_url() -> str | None:
     return None
 
 
-def archive_strip_prefix(archive: zipfile.ZipFile) -> tuple[str, ...]:
+def archive_strip_prefix(archive: zipfile.ZipFile, asset_stem: str) -> tuple[str, ...]:
     """Return a single top-level directory prefix to strip, or empty tuple.
 
-    Standalone app zips are packaged as:
+    Some standalone app zips are packaged as:
 
         app-latest-<sha>-<platform>/<payload>
 
     The aggregate bundle already places each source under apps/<app_id>/, so
     preserving that release-name directory creates a useless extra nesting
-    level. Only strip when every non-empty member is under one common top-level
-    directory; multi-root zips are extracted as-is.
+    level.
+
+    Do not strip semantic payload roots. In particular, a top-level
+    "Something.app/" directory is the macOS app bundle itself, not a disposable
+    archive wrapper. Stripping it would turn a valid bundle into
+    "Contents/..." under apps/<app_id>/.
+
+    Only strip when every non-empty member is under one common top-level
+    directory that exactly matches the source zip stem. Multi-root zips and
+    app-bundle-root zips are extracted as-is.
     """
     top_levels: set[str] = set()
     for member in archive.infolist():
@@ -66,6 +74,10 @@ def archive_strip_prefix(archive: zipfile.ZipFile) -> tuple[str, ...]:
     if len(top_levels) != 1:
         return ()
     only = next(iter(top_levels))
+    if only.endswith(".app"):
+        return ()
+    if only != asset_stem:
+        return ()
     for member in archive.infolist():
         member_path = PurePosixPath(member.filename)
         if len(member_path.parts) == 1 and not member.is_dir():
@@ -75,7 +87,7 @@ def archive_strip_prefix(archive: zipfile.ZipFile) -> tuple[str, ...]:
 
 def safe_extract(zip_path: Path, destination: Path) -> None:
     with zipfile.ZipFile(zip_path) as archive:
-        strip_prefix = archive_strip_prefix(archive)
+        strip_prefix = archive_strip_prefix(archive, zip_path.stem)
         for member in archive.infolist():
             member_path = PurePosixPath(member.filename)
             if member_path.is_absolute() or not member_path.parts or ".." in member_path.parts:
