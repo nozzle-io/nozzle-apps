@@ -45,13 +45,47 @@ def workflow_run_url() -> str | None:
     return None
 
 
+def archive_strip_prefix(archive: zipfile.ZipFile) -> tuple[str, ...]:
+    """Return a single top-level directory prefix to strip, or empty tuple.
+
+    Standalone app zips are packaged as:
+
+        app-latest-<sha>-<platform>/<payload>
+
+    The aggregate bundle already places each source under apps/<app_id>/, so
+    preserving that release-name directory creates a useless extra nesting
+    level. Only strip when every non-empty member is under one common top-level
+    directory; multi-root zips are extracted as-is.
+    """
+    top_levels: set[str] = set()
+    for member in archive.infolist():
+        member_path = PurePosixPath(member.filename)
+        if member_path.is_absolute() or not member_path.parts or ".." in member_path.parts:
+            fail(f"unsafe zip member: {member.filename}")
+        top_levels.add(member_path.parts[0])
+    if len(top_levels) != 1:
+        return ()
+    only = next(iter(top_levels))
+    for member in archive.infolist():
+        member_path = PurePosixPath(member.filename)
+        if len(member_path.parts) == 1 and not member.is_dir():
+            return ()
+    return (only,)
+
+
 def safe_extract(zip_path: Path, destination: Path) -> None:
     with zipfile.ZipFile(zip_path) as archive:
+        strip_prefix = archive_strip_prefix(archive)
         for member in archive.infolist():
             member_path = PurePosixPath(member.filename)
             if member_path.is_absolute() or not member_path.parts or ".." in member_path.parts:
                 fail(f"unsafe zip member in {zip_path}: {member.filename}")
-            target = destination.joinpath(*member_path.parts)
+            target_parts = member_path.parts
+            if strip_prefix and target_parts[:len(strip_prefix)] == strip_prefix:
+                target_parts = target_parts[len(strip_prefix):]
+            if not target_parts:
+                continue
+            target = destination.joinpath(*target_parts)
             mode = (member.external_attr >> 16) & 0o7777
             if member.is_dir():
                 target.mkdir(parents=True, exist_ok=True)

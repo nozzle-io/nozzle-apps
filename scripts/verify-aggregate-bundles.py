@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import os
 import plistlib
 import shutil
@@ -84,6 +85,23 @@ def verify_macos_apps(root: Path, bundle_name: str) -> None:
         fail(f"{bundle_name}: expected macOS .app bundles, found none")
 
 
+def verify_no_redundant_source_roots(root: Path) -> None:
+    manifest_path = root / "manifest.json"
+    if not manifest_path.is_file():
+        fail(f"missing bundle manifest: {manifest_path}")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    apps_root = root / "apps"
+    for app in manifest.get("apps", []):
+        app_id = app.get("app_id")
+        asset_name = app.get("source_asset_name")
+        if not isinstance(app_id, str) or not isinstance(asset_name, str):
+            fail(f"{manifest_path}: malformed app entry")
+        asset_stem = asset_name[:-4] if asset_name.endswith(".zip") else asset_name
+        redundant = apps_root / app_id / asset_stem
+        if redundant.exists():
+            fail(f"{root}: redundant source zip root was not stripped: {redundant.relative_to(root)}")
+
+
 def verify_zip(zip_path: Path) -> None:
     if not zip_path.is_file():
         fail(f"missing zip: {zip_path}")
@@ -96,6 +114,7 @@ def verify_zip(zip_path: Path) -> None:
         if not root.is_dir():
             fail(f"{zip_path}: missing nozzle-apps root after extraction")
         verify_bundle_sha256s(root)
+        verify_no_redundant_source_roots(root)
         verify_macos_apps(root, zip_path.name)
     print(f"verified {zip_path}")
 
