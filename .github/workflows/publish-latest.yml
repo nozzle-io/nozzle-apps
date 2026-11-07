@@ -11,6 +11,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Checkout pinned core ISA checker
+        uses: actions/checkout@v4
+        with:
+          repository: nozzle-io/nozzle
+          ref: 79637d4b25b13b1d7ab5751ccc7d0a0e14bc808e
+          path: build/isa-checker
+          submodules: false
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
@@ -37,7 +45,7 @@ jobs:
           for path in "${expected[@]}"; do
             test -f "$path"
           done
-          python3 scripts/verify-aggregate-bundles.py dist/nozzle-apps-latest-*.zip
+          python3 scripts/verify-aggregate-bundles.py --isa-checker-root build/isa-checker dist/nozzle-apps-latest-*.zip
       - name: Move latest tag
         run: |
           git config user.name "github-actions[bot]"
