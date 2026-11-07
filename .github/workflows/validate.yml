@@ -15,6 +15,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Checkout pinned core ISA checker
+        uses: actions/checkout@v4
+        with:
+          repository: nozzle-io/nozzle
+          ref: 79637d4b25b13b1d7ab5751ccc7d0a0e14bc808e
+          path: build/isa-checker
+          submodules: false
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
@@ -26,3 +34,6 @@ jobs:
         run: python3 -m py_compile scripts/*.py
       - name: Permission preservation regression
         run: python3 scripts/test-permission-preservation.py
+      - name: Final Linux archive ISA regression
+        timeout-minutes: 5
+        run: python3 scripts/test-final-archive-isa.py --isa-checker-root build/isa-checker
